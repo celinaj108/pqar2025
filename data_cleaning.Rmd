@@ -1,0 +1,85 @@
+---
+title: "Social_Cohesion_Project"
+author: "Celina Jang"
+date: "2025-06-11"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+```
+
+# Week 1
+```{r}
+# load data
+chs2020 <- read.csv("chs2020_clean.csv")
+uhf <- read.csv('uhf_lookup.csv')
+# inspect data
+head(chs2020)
+str(chs2020)
+summary(chs2020)
+
+# Create a backup
+write.csv(chs2020, "chs2020_clean_raw.csv", row.names = FALSE)
+
+# mood1 to mood6 (K6 items), helpneighbors20_q1, discussissues, helpcommproj, trustkeys, proudneigh (social cohesion), agegroup, birthsex, newrace6, education, employment20, imputed_povertygroup, hhsize (demographics), delaypayrent, rodentsstreet (environmental stressors), k6, nspd (psychological distress), and any borough variable (might be encoded in strata). Extra Variables to Keep: all weighting variables (wt21_dual, etc.), sampling variables (strata, survey, etc.), and any variables that might relate to borough, neighborhood, or social context
+
+# cleaned dataset with key variables that are recoded (missing borough/location)
+chs2020_cleaned <- chs2020 |>
+  select(strata, survey, mood1, mood2, mood3, mood4, mood5, mood6, helpneighbors20_q1,
+         discussissues, helpcommproj, trustkeys, proudneigh, agegroup, 
+         birthsex, newrace6, education, employment20,
+         imputed_povertygroup, hhsize, delaypayrent, rodentsstreet, k6, nspd, 
+         wt21_dual
+         ) |>
+  # recoding demographic variables
+  mutate(
+    ageband = case_when (
+      agegroup == 1 | agegroup==2 ~ '18-44',
+      agegroup == 3 ~ '45-64',
+      agegroup == 4 ~ '65+'
+    ) , 
+    gender = as.factor(case_when (
+      birthsex==1 ~ 'male',
+      birthsex==2 ~ 'female'
+    )),
+    race_ethnicity = as.factor(case_when (
+      newrace6 == 1 ~ 'White',
+      newrace6 == 2 ~ 'Black',
+      newrace6 == 3 ~ 'Hispanic',
+      newrace6 == 4 ~ 'Asian/Pacific Islander',
+      newrace6 == 5 ~ 'North African/Mid Eastern',
+      newrace6 == 6 ~ 'Other'
+    ))
+  )
+
+# summarize 
+table(chs2020_cleaned$imputed_povertygroup, useNA = "ifany") # no NA
+table(chs2020_cleaned$education, useNA = "ifany")
+
+# info abt missing/NA values
+missing_summary <- sapply(chs2020_cleaned[, c("mood1", "helpneighbors20_q1", "agegroup", "newrace6")],
+                          function(x) sum(is.na(x)))
+missing_percentage <- (missing_summary / nrow(chs2020_cleaned)) * 100
+
+missing_summary <- sapply(chs2020_cleaned[, c("helpneighbors20_q1", "discussissues", "helpcommproj", "trustkeys", 'proudneigh')],function(x) sum(is.na(x)))
+
+# compute k6 total and social cohesion score
+chs2020_cleaned$k6_total <- 
+  rowSums(chs2020_cleaned[, c("mood1", "mood2", "mood3", "mood4", "mood5", "mood6")],
+                            na.rm = TRUE)
+
+chs2020_cleaned$social_cohesion <- rowSums(chs2020_cleaned[, c("helpneighbors20_q1",
+                                               "discussissues",
+                                               "helpcommproj",
+                                               "trustkeys",
+                                               "proudneigh")], na.rm = TRUE)
+
+# save cleaned dataset as new csv file
+write.csv(chs2020, "chs2020_clean_working.csv", row.names = FALSE)
+
+
+```
+
