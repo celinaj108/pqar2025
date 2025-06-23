@@ -1,4 +1,5 @@
 # Week 2 Analysis
+# Writer: Celina Jang
 
 # Internal Consistency (Cronbach's Alpha):
 ## Considering content validity, we decided that helpneighbors20_q1 that asks--
