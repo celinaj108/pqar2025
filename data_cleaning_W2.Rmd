@@ -1,0 +1,328 @@
+---
+title: "Social Cohesion Project Week 2"
+author: "Celina Jang"
+date: "2025-06-11"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+```
+
+# Week 2 Tasks
+
+```{r}
+
+# Call cleaned dataset 
+chs2020_cleaned_q1 <- read.csv("chs2020_q1_working.csv")
+
+  
+# Check internal consistency (used both alpha and omega) 
+library(psych)
+alpha(chs2020_cleaned_q1[, c("helpneighbors20_q1", "discussissues", 
+                             "helpcommproj", "trustkeys", "proudneigh")])
+## overall alpha = 0.649
+
+# OPTIONAL ANALYSIS: Consider survey weight
+library(survey)
+chs2020_weighted_q1 <- svydesign(ids = ~cid, data = chs2020_cleaned_q1, 
+                                strata = ~strata_q1, weights = ~wt21_dual_q1, nest=TRUE)
+svycralpha(~helpneighbors20_q1+discussissues+helpcommproj+trustkeys+proudneigh, 
+           chs2020_weighted_q1, na.rm=T)
+
+omega(chs2020_cleaned_q1[, c("helpneighbors20_q1", "discussissues", 
+                             "helpcommproj", "trustkeys", "proudneigh")])
+
+# Check exploratory factor analysis 
+fa(chs2020_cleaned_q1[, c("helpneighbors20_q1", "discussissues", "helpcommproj", 
+                          "trustkeys", "proudneigh")], nfactors = 1, fm = "ml")$loadings
+## all of the items have loadings > 0.3
+
+# Compare scale performance by age group
+aggregate(social_cohesion ~ ageband, data = chs2020_cleaned_q1, FUN = mean, na.rm = TRUE)
+
+# ADDITIONAL: ANOVA
+sc_age_lm <- lm(social_cohesion ~ ageband, data = chs2020_cleaned_q1)
+anova(sc_age_lm)
+
+# Descriptive analysis of key variables
+## k6_total
+chs2020_cleaned_q1 |> 
+  ggplot(aes(x=k6_total)) + geom_boxplot()
+summary(chs2020_cleaned_q1$k6_total)
+
+## nspd
+chs2020_cleaned_q1 |>
+  mutate(nspd_response = case_when(nspd==1 ~ 'Yes', nspd==2 ~ 'No', is.na(nspd) ~ NA)) |>
+  group_by(nspd_response, ageband) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(ageband) |>
+  mutate(proportion = count / sum(count)*100)
+ 
+## ageband
+chs2020_cleaned_q1 |>
+  count(ageband) |>
+  summarize(
+    ageband=ageband,
+    percent = n/sum(n) *100,
+    count=n)
+
+## gender
+chs2020_cleaned_q1 |>
+  count(gender) |>
+  summarize(
+    gender=gender,
+    percent = n/sum(n) *100,
+    count=n)
+  
+chs2020_cleaned_q1 |>
+  group_by(gender, ageband) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(ageband) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+ 
+
+## race/ethnicity
+chs2020_cleaned_q1 |>
+  count(race_ethnicity) |>
+  summarize(
+    race_ethnicity=race_ethnicity,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned_q1 |>
+  group_by(race_ethnicity, ageband) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(ageband) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+## education
+chs2020_cleaned_q1 |>
+  mutate(
+    education_lev = 
+      case_when(education==1 ~ 'Less than high school',
+                education==2 ~ 'High school graduate',
+                education==3 ~ 'Some college/technical school',
+                education==4 ~ 'College graduate',
+                education=='.d' ~ 'Dont know',
+                education=='.r' ~ 'Refused',
+                is.na(education) ~ NA)
+    ) |>
+  count(education_lev) |>
+  summarize(
+    education=education_lev,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned_q1 |>
+   mutate(
+    education_lev = 
+      case_when(education==1 ~ 'Less than high school',
+                education==2 ~ 'High school graduate',
+                education==3 ~ 'Some college/technical school',
+                education==4 ~ 'College graduate',
+                education=='.d' ~ 'Dont know',
+                education=='.r' ~ 'Refused',
+                is.na(education) ~ NA)
+    ) |>
+  group_by(education_lev, ageband) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(ageband) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+
+## employment20
+chs2020_cleaned_q1 |>
+  mutate(
+    employment = 
+      case_when(employment20==1 ~ 'Employed for wages or salary',
+                employment20==2 ~ 'Self-employed',
+                employment20==3 ~ 'Unemployed for 1 year or more',
+                employment20==4 ~ 'Unemployed for less than 1 year',
+                employment20==5 ~ 'A homemaker',
+                employment20==6 ~ 'A student',
+                employment20==7 ~ 'Retired',
+                employment20==8 ~ 'Unable to work',
+                employment20=='.d' ~ 'Dont know',
+                employment20=='.r' ~ 'Refused',
+                is.na(employment20) ~ NA)
+    )|>
+  count(employment) |>
+  summarize(
+    employment=employment,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned_q1 |>
+   mutate(
+    employment = 
+      case_when(employment20==1 ~ 'Employed for wages or salary',
+                employment20==2 ~ 'Self-employed',
+                employment20==3 ~ 'Unemployed for 1 year or more',
+                employment20==4 ~ 'Unemployed for less than 1 year',
+                employment20==5 ~ 'A homemaker',
+                employment20==6 ~ 'A student',
+                employment20==7 ~ 'Retired',
+                employment20==8 ~ 'Unable to work',
+                employment20=='.d' ~ 'Dont know',
+                employment20=='.r' ~ 'Refused',
+                is.na(employment20) ~ NA)
+    )|>
+  group_by(employment, ageband) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(ageband) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+## imputed poverty group
+chs2020_cleaned_q1 |>
+  mutate(
+    poverty_level = 
+      case_when(imputed_povertygroup==1 ~ '<100% poverty',
+                imputed_povertygroup==2 ~ '100% - <200% poverty',
+                imputed_povertygroup==3 ~ '200% - <400% poverty',
+                imputed_povertygroup==4 ~ '400% - <600% poverty',
+                imputed_povertygroup==5~ '>=600% poverty',
+                is.na(imputed_povertygroup) ~ NA)
+    )|>
+  count(poverty_level) |>
+  summarize(
+    poverty_group=poverty_level,
+    percent =round( n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned_q1 |>
+   mutate(
+    poverty_level = 
+      case_when(imputed_povertygroup==1 ~ '<100% poverty',
+                imputed_povertygroup==2 ~ '100% - <200% poverty',
+                imputed_povertygroup==3 ~ '200% - <400% poverty',
+                imputed_povertygroup==4 ~ '400% - <600% poverty',
+                imputed_povertygroup==5~ '>=600% poverty',
+                is.na(imputed_povertygroup) ~ NA)
+    )|>
+  group_by(poverty_level, ageband) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(ageband) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+## hhsize
+chs2020_cleaned_q1 |>
+  count(hhsize) |>
+  summarize(
+    householdsize=hhsize,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+## delaypayrent
+chs2020_cleaned_q1 |>
+  mutate(delaypayrent_response = case_when(
+    delaypayrent == 1 ~ 'Yes',
+    delaypayrent == 2 ~ 'No',
+    delaypayrent == '.d' ~ 'Dont know',
+    delaypayrent == '.r' ~ 'Refused'
+  )) |>
+  count(delaypayrent_response) |>
+  summarize(
+    delaypayrent_response=delaypayrent_response,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+## rodentsstreet
+chs2020_cleaned_q1 |>
+  mutate(rodent = case_when(
+    rodentsstreet == 1 ~ 'Yes',
+    rodentsstreet == 2 ~ 'No',
+    rodentsstreet == '.d' ~ 'Dont know',
+    rodentsstreet == '.r' ~ 'Refused'
+  )) |>
+  count(rodent) |>
+  summarize(
+    rodentsstreet_response=rodent,
+    percent =round( n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned_q1 |>
+   mutate(rodent = case_when(
+    rodentsstreet == 1 ~ 'Yes',
+    rodentsstreet == 2 ~ 'No',
+    rodentsstreet == '.d' ~ 'Dont know',
+    rodentsstreet == '.r' ~ 'Refused'
+  ))|>
+  group_by(rodent, ageband) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(ageband) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+## smellcigsmoke20_q1
+chs2020_cleaned_q1 |>
+  mutate(smellcig = case_when(
+    smellcigsmoke20_q1 == 1 ~ 'Everyday',
+    smellcigsmoke20_q1 == 2 ~ 'A few times per week',
+    smellcigsmoke20_q1 == 3 ~ 'A few times per month',
+    smellcigsmoke20_q1 == 4 ~ 'A few times per year',
+    smellcigsmoke20_q1 == 5 ~ 'Never',
+    smellcigsmoke20_q1 == '.d' ~ 'Dont know',
+    smellcigsmoke20_q1 == '.r' ~ 'Refused',
+    is.na(smellcigsmoke20_q1) ~ NA
+  )) |>
+  count(smellcig) |>
+  summarize(
+    smellcigsmoke=smellcig,
+    percent =round(n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned_q1 |>
+   mutate(smellcig = case_when(
+    smellcigsmoke20_q1 == 1 ~ 'Everyday',
+    smellcigsmoke20_q1 == 2 ~ 'A few times per week',
+    smellcigsmoke20_q1 == 3 ~ 'A few times per month',
+    smellcigsmoke20_q1 == 4 ~ 'A few times per year',
+    smellcigsmoke20_q1 == 5 ~ 'Never',
+    smellcigsmoke20_q1 == '.d' ~ 'Dont know',
+    smellcigsmoke20_q1 == '.r' ~ 'Refused',
+    is.na(smellcigsmoke20_q1) ~ NA
+  )) |>
+  group_by(smellcig, ageband) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(ageband) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+```
+
+
+```
+
