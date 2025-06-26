@@ -1,0 +1,246 @@
+---
+title: "Social Cohesion Project"
+author: "Gabrielle Jones"
+date: "2025-06-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r setup, include=FALSE}
+chs2020 <- read.csv('chs2020_q1_working.csv')
+read.csv('chs2020_q1_working.csv')
+install.packages("psych")
+library(psych)
+alpha(chs2020[, c("helpneighbors20_q1", "discussissues", "helpcommproj", "trustkeys", "proudneigh")])
+
+aggregate(social_cohesion ~ ageband, data = chs2020, FUN = mean, na.rm = TRUE)
+
+chs_18_24 <- subset(chs2020, ageband == "18-24")
+
+cohesion_items<-c("helpneighbors20_q1","discussissues","helpcommproj","trust")
+chs_18_24<-subset(chs2020,ageband=="18-24")
+efa_18_24 <- fa(chs2020_18_24[ , cohesion_items], nfactors = 1, rotate = "none")  # Or adjust `nfactors`
+print(efa_18_24)
+
+names(chs)
+
+efa_result <- fa(chs2020[, c("helpneighbors20_q1", "discussissues", "helpcommproj", "trustkeys", "proudneigh")], nfactors = 1, fm = "ml")
+print(efa_result$loadings)
+
+library(tidyverse)
+library(readr)
+library(dplyr)
+
+chs2020('chs2020_q1_working.csv')
+
+head(chs2020)
+str(chs2020)
+summary(chs2020)
+
+chs2020$ageband<-cut(chs2020$agegroup,
+                     breaks=c(0,39,64,Inf),
+                     labels=c("18-39","40-64","65+"),
+                     right=TRUE)
+
+chs2020$gender<-factor(chs2020$birthsex,
+                       levels=c(1,2),
+                       labels=c("Male","Female"))
+
+
+chs2020$race_ethnicity<-factor(chs2020$newrace6,
+                               levels=c(1,2,3,4,5,6),
+                               labels=c("white","black","Hispanic",
+                                        "Asian/Pacific Islander", 
+                                        "North African/Mid Eastern",
+                                        "Other"))
+
+chs2020$k6_total<- rowSums(chs2020[, c("mood1","mood2","mood3","mood4","mood5","mood6")],
+na.rm=TRUE )
+
+chs2020social_cohesion<-rowMeans(chs2020[,c("helpneighbors20_q1",
+                                            "discussissues",
+                                            "helpcommproj",
+                                            "trustkeys",
+                                            "proudneigh")],
+                                 na.rm=TRUE)
+ 
+chs2020$social_cohesion <- rowMeans(chs2020[, c("helpneighbors20_q1", 
+                                                 "discussissues", 
+                                                 "helpcommproj", 
+                                                 "trustkeys", 
+                                                 "proudneigh")], 
+                                     na.rm = TRUE)
+
+chs2020_cleaned <- chs2020 |>
+  select(strata_q1, survey, mood1, mood2, mood3, mood4, mood5, mood6, helpneighbors20_q1,
+         discussissues, helpcommproj, trustkeys, proudneigh, agegroup, 
+         birthsex, newrace6, education, employment20,
+         imputed_povertygroup, hhsize, delaypayrent, rodentsstreet, k6, nspd, 
+         wt21_dual_q1, social_cohesion, k6_total) |>
+  mutate(
+    # Recode age group
+    ageband = case_when(
+      agegroup %in% c(1, 2) ~ "18-44",
+      agegroup == 3 ~ "45-64",
+      agegroup == 4 ~ "65+"
+    ),
+    # Recode gender
+    gender = factor(case_when(
+      birthsex == 1 ~ "Male",
+      birthsex == 2 ~ "Female"
+    )),
+    # Recode race/ethnicity
+    race_ethnicity = factor(case_when(
+      newrace6 == 1 ~ "White",
+      newrace6 == 2 ~ "Black",
+      newrace6 == 3 ~ "Hispanic",
+      newrace6 == 4 ~ "Asian/Pacific Islander",
+      newrace6 == 5 ~ "North African/Mid Eastern",
+      newrace6 == 6 ~ "Other"
+    ))
+  )
+
+names(chs2020)
+
+head(chs2020_cleaned)
+
+library(tidyverse)
+library(dplyr)
+install.packages("psych")
+library(psych)
+
+k6_items <- c("mood1", "mood2", "mood3", "mood4", "mood5", "mood6")
+
+
+
+k6_items <- c("mood1", "mood2", "mood3", "mood4", "mood5", "mood6")
+cohesion_items <- c("helpneighbors20_q1", "discussissues", "helpcommproj", "trustkeys", "proudneigh")
+
+summary(chs2020_cleaned[k6_items])
+
+summary(chs2020_cleaned[cohesion_items])
+
+k6_items <- c("mood1", "mood2", "mood3", "mood4", "mood5", "mood6")
+cohesion_items <- c("helpneighbors20_q1", "discussissues", "helpcommproj", "trustkeys", "proudneigh")
+
+lapply(chs2020_cleaned[k6_items], table, useNA = "ifany")
+lapply(chs2020_cleaned[cohesion_items], table, useNA = "ifany")
+
+
+par(mfrow = c(2, 3))  # 2 rows, 3 columns layout
+for (item in k6_items) {
+  barplot(table(chs2020_cleaned[[item]]), 
+          main = paste("Distribution of", item),
+          xlab = item, ylab = "Frequency", col = "skyblue")
+  
+par(mfrow = c(2, 3))  # Reset for cohesion plots
+for (item in cohesion_items) {
+  barplot(table(chs2020_cleaned[[item]]), main = paste("Distribution of", item),
+          xlab = item, ylab = "Frequency", col = "lightgreen")  
+  
+  
+  
+  
+alpha_cohesion <- alpha(chs2020_cleaned[cohesion_items])
+print(alpha_cohesion$total$raw_alpha)  # Cronbach's alpha  
+
+efa_result <- fa(chs2020_cleaned[cohesion_items], nfactors = 1, fm = "ml")
+print(efa_result$loadings)  
+  
+aggregate(social_cohesion ~ ageband, data = chs2020_cleaned, FUN = mean, na.rm = TRUE)  
+  
+ cat("SUMMARY OF FINDINGS:\n")
+cat("1. Cronbach’s Alpha for cohesion scale:", round(alpha_cohesion$total$raw_alpha, 3), "\n")
+cat("2. Factor loadings:\n")
+print(efa_result$loadings)
+cat("3. No items removed from the scale (assuming all loadings acceptable).\n")
+cat("4. Average cohesion scores by age group:\n")
+print(aggregate(social_cohesion ~ ageband, data = chs2020_cleaned, FUN = mean, na.rm = TRUE))   
+ 
+write.csv(chs2020_cleaned, "chs2020_cleaned_with_scales.csv", row.names = FALSE)
+
+chs2020$distressed <- ifelse(chs2020$k6_total >= 13, 1, 0)
+
+table_age_distress <- table(chs2020$ageband, chs2020$distressed)
+prop.table(table_age_distress, 1) * 100  
+ 
+length(chs2020$age_band)  
+length(chs2020$distressed)
+
+names(chs2020)
+
+table(chs2020$ageband, useNA = "ifany")
+table(chs2020$agegroup, useNA = "ifany"
+
+table_age_distress <- table(chs2020$ageband, chs2020$distressed)
+prop.table(table_age_distress, 1) * 100
+
+table(chs2020$distressed)
+
+summary(chs2020$k6_total)
+mean(chs2020$k6_total >= 13) * 100 
+
+chs2020_k6_items <- c("mood1","mood2","mood3","mood4","mood5","mood6")
+
+chs2020[paste0(chs2020_k6_items, "_adj")] <- chs2020[, chs2020_k6_items] - 1
+
+chs2020$k6_total_adj <- rowSums(chs2020[, paste0(chs2020_k6_items, "_adj")], na.rm = TRUE)
+
+summary(chs2020$k6_total_adj)
+mean(chs2020$k6_total_adj >= 13) * 100  # % distressed overall with adjusted scale
+
+summary(chs2020$k6_total_adj)
+mean(chs2020$k6_total_adj >= 13) * 100  # % distressed overall with adjusted scale
+
+chs2020$distressed_adj <- ifelse(chs2020$k6_total_adj >= 19, 1, 0)
+
+table_age_distress_adj <- table(chs2020$ageband, chs2020$distressed_adj)
+
+# Calculate row-wise percentages
+prop_table_adj <- prop.table(table_age_distress_adj, 1) * 100
+
+# Print nicely with labels
+data.frame(
+  Age_Group = rownames(prop_table_adj),
+  Not_Distressed_Percent = round(prop_table_adj[, "0"], 2),
+  Distressed_Percent = round(prop_table_adj[, "1"], 2)
+)
+
+install.packages("dplyr")
+install.packages("psych")
+
+library(dplyr)
+library(psych)
+
+continuous_vars<-c("age","social_cohesion","fruitveg20")
+describe(chs2020[, continuous_vars])
+
+cat_vars <- c("birthsex", "newrace6", "education", "employment20", "agegroup",
+              "insured", "imputed_povertygroup", "delaypayrent", "usborn", "maritalstatus20",
+              "sexualid20", "ipvphy", "didntgetcare20", "rodentsstreet", "generalhealth",
+              "pcp20", "skiprxcost", "insure5", "imputed_povgroup3", "imputed_pov200",
+              "helpneighbors20_q1", "discussissues", "helpcommproj", "trustkeys", "proudneigh")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+efa_result <- fa(chs2020[, c("helpneighbors20_q1", "discussissues", "helpcommproj", "trustkeys", "proudneigh")], nfactors = 1, fm = "ml")
+
+
+
