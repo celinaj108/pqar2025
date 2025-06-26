@@ -1,0 +1,614 @@
+---
+title: "W3"
+author: "Celina Jang"
+date: "2025-06-25"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Week 3
+```{r}
+chs2020_raw <- read.csv('chs2020_clean_raw.csv')
+
+# new cleaned dataset with additional variables 
+chs2020_cleaned <- chs2020_raw |>
+   # Only using those who answered version 1 survey
+  filter(!is.na(strata_q1)) |>
+  
+  select(strata_q1, survey, mood1, mood2, mood3, mood4, mood5, mood6, helpneighbors20_q1,
+         discussissues, helpcommproj, trustkeys, proudneigh, agegroup, 
+         birthsex, newrace6, education, employment20, insured, usborn, maritalstatus20, 
+         sexualid20, ipvphy, bmi, didntgetcare20, fruitveg20, generalhealth, pcp20, 
+         skiprxcost, insure5, imputed_povgroup3, imputed_pov200,
+         imputed_povertygroup, hhsize, delaypayrent, rodentsstreet, k6, nspd, 
+         wt21_dual_q1
+         ) |>
+  # recoding demographic variables
+  mutate(
+    age_band = case_when (
+      agegroup == 1 | agegroup==2 ~ '18-44',
+      agegroup == 3 ~ '45-64',
+      agegroup == 4 ~ '65+'
+    ) , 
+    gender = as.factor(case_when (
+      birthsex==1 ~ 'male',
+      birthsex==2 ~ 'female'
+    )),
+    race_ethnicity = as.factor(case_when (
+      newrace6 == 1 ~ 'White',
+      newrace6 == 2 ~ 'Black',
+      newrace6 == 3 ~ 'Hispanic',
+      newrace6 == 4 ~ 'Asian/Pacific Islander',
+      newrace6 == 5 ~ 'North African/Mid Eastern',
+      newrace6 == 6 ~ 'Other'
+    ))
+  )
+
+
+# compute k6 total and social cohesion score
+chs2020_cleaned$k6_total <- 
+  rowSums(chs2020_cleaned[, c("mood1", "mood2", "mood3", "mood4", "mood5", "mood6")],
+                            na.rm = TRUE)
+
+chs2020_cleaned$social_cohesion <- rowSums(chs2020_cleaned[, c("helpneighbors20_q1",
+                                               "discussissues",
+                                               "helpcommproj",
+                                               "trustkeys",
+                                               "proudneigh")], na.rm = TRUE)
+
+# save cleaned dataset as new csv file
+write.csv(chs2020_cleaned, "chs2020_working_w3.csv", row.names = FALSE)
+  
+
+```
+
+# Construct Validity
+```{r}
+# general ehatlh
+cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$generalhealth, use = 'complete.obs', method = 'spearman')
+
+summary(lm(generalhealth ~ social_cohesion, data=chs2020_cleaned))
+
+plot(y=as.factor(chs2020_cleaned$generalhealth), x=chs2020_cleaned$social_cohesion)
+
+#fruitveg20
+cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$fruitveg20, use = 'complete.obs', method = 'pearson')
+summary(lm(fruitveg20 ~ social_cohesion, data=chs2020_cleaned))
+
+
+#delaypayrent
+cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$delaypayrent, use = 'complete.obs', method = 'pearson')
+
+chs2020_cleaned<- chs2020_cleaned |> mutate(delaypayrent0 = case_when(
+  delaypayrent == 1 ~ 0,
+  delaypayrent == 2 ~ 1,
+  is.na(delaypayrent) ~ NA
+))
+
+rent_glm <- glm(delaypayrent0 ~ social_cohesion, data=chs2020_cleaned, family = binomial)
+exp(-0.04206)
+summary(rent_glm)
+
+
+#didntgetcare20
+cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$didntgetcare20, use = 'complete.obs', method = 'pearson')
+chs2020_cleaned<- chs2020_cleaned |> mutate(didntgetcare0 = case_when(
+  didntgetcare20 == 1 ~ 0,
+  didntgetcare20 == 2 ~ 1,
+  is.na(didntgetcare20) ~ NA
+))
+
+care_glm<- glm(didntgetcare0 ~ social_cohesion, data=chs2020_cleaned, family = binomial)
+exp(-0.04194)
+summary(care_glm)
+
+```
+
+
+# Criterion validity
+```{r }
+
+cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$k6, use = 'complete.obs', method = 'pearson')
+
+summary(lm(k6 ~ social_cohesion ,data=chs2020_cleaned))
+
+```
+
+# Summary TABLE A (MAYBE)
+```{r}
+
+library(dplyr)
+library(purrr)
+
+# Recode helper
+recode_var <- function(data, var) {
+  # Only add age_band if it doesn't exist
+  if (!"age_band" %in% names(data) && "agegroup" %in% names(data)) {
+    data <- data |> mutate(
+      age_band = case_when(
+        agegroup == 1 | agegroup == 2 ~ '18-44',
+        agegroup == 3 ~ '45-64',
+        agegroup == 4 ~ '65+',
+        TRUE ~ NA_character_
+      )
+    )
+  }
+  if (var == "education") {
+    data <- data |> mutate(
+      education_lev = case_when(
+        education == 1 ~ 'Less than high school',
+        education == 2 ~ 'High school graduate',
+        education == 3 ~ 'Some college/technical school',
+        education == 4 ~ 'College graduate',
+        education == '.d' ~ 'Dont know',
+        education == '.r' ~ 'Refused',
+        TRUE ~ NA_character_
+      )
+    )
+  } else if (var == "employment20") {
+    data <- data |> mutate(
+      employment = case_when(
+        employment20 == 1 ~ 'Employed for wages or salary',
+        employment20 == 2 ~ 'Self-employed',
+        employment20 == 3 ~ 'Unemployed for 1 year or more',
+        employment20 == 4 ~ 'Unemployed for less than 1 year',
+        employment20 == 5 ~ 'A homemaker',
+        employment20 == 6 ~ 'A student',
+        employment20 == 7 ~ 'Retired',
+        employment20 == 8 ~ 'Unable to work',
+        employment20 == '.d' ~ 'Dont know',
+        employment20 == '.r' ~ 'Refused',
+        TRUE ~ NA_character_
+      )
+    )
+  } else if (var == "imputed_povertygroup") {
+    data <- data |> mutate(
+      poverty_level = case_when(
+        imputed_povertygroup == 1 ~ '<100% poverty',
+        imputed_povertygroup == 2 ~ '100% - <200% poverty',
+        imputed_povertygroup == 3 ~ '200% - <400% poverty',
+        imputed_povertygroup == 4 ~ '400% - <600% poverty',
+        imputed_povertygroup == 5 ~ '>=600% poverty',
+        TRUE ~ NA_character_
+      )
+    )
+  }
+  return(data)
+}
+
+# Variables to summarize
+vars_to_summarize <- list(
+  age_band = "ageband",
+  gender = "gender",
+  race_ethnicity = "race_ethnicity",
+  education = "education",
+  employment20 = "employment",
+  imputed_povertygroup = "poverty_group",
+  hhsize = "householdsize"
+)
+
+chs2020_cleaned_recoded <- recode_var(chs2020_cleaned, "education")
+chs2020_cleaned_recoded <- recode_var(chs2020_cleaned_recoded, "employment20")
+chs2020_cleaned_recoded <- recode_var(chs2020_cleaned_recoded, "imputed_povertygroup")
+
+# Now get_summary just uses this data as is, without recoding:
+get_summary <- function(data, var_name, display_name) {
+  
+  # Map var_name to actual column name after recode if needed
+  col_name <- if(var_name %in% c("education", "employment20", "imputed_povertygroup")) {
+    if(var_name == "education") "education_lev" else
+    if(var_name == "employment20") "employment" else
+    if(var_name == "imputed_povertygroup") "poverty_level"
+  } else var_name
+  
+  # Remove NAs in col_name
+  data_clean <- data |> filter(!is.na(.data[[col_name]]))
+  
+  if (col_name == "age_band") {
+    overall <- data_clean |> 
+      count(age_band) |> 
+      rename(level = age_band) |> 
+      mutate(
+        percent = round(n / sum(n) * 100, 2),
+        ageband = "Overall",
+        variable = display_name
+      )
+    
+    by_ageband <- overall |> 
+      mutate(ageband = level)
+    
+  } else {
+    overall <- data_clean |> 
+      count(!!sym(col_name)) |> 
+      mutate(
+        percent = round(n / sum(n) * 100, 2),
+        ageband = "Overall",
+        variable = display_name
+      ) |> 
+      rename(level = !!sym(col_name))|> 
+      mutate(level = as.character(level))
+    
+    by_ageband <- data_clean |> 
+      group_by(age_band, !!sym(col_name)) |> 
+      count() |> 
+      ungroup() |> 
+      group_by(age_band) |> 
+      mutate(percent = round(n / sum(n) * 100, 2)) |> 
+      mutate(variable = display_name) |> 
+      rename(level = !!sym(col_name), ageband = age_band)|> 
+      mutate(level = as.character(level))
+  }
+  
+  combined <- bind_rows(overall, by_ageband) |> 
+    select(variable, ageband, level, count = n, percent)
+  
+  return(combined)
+}
+
+# Then run map2_dfr with pre-recoded data:
+summary_all <- map2_dfr(
+  names(vars_to_summarize),
+  vars_to_summarize,
+  ~ get_summary(chs2020_cleaned_recoded, .x, .y)
+)
+# View result
+print(summary_all)
+
+if (!dir.exists("summary_tables")) {
+  dir.create("summary_tables")
+}
+summary_all %>%
+  split(.$variable) %>%               # split into list by variable
+  imap(~ write.csv(.x, 
+                   file = paste0("summary_tables/", .y, "_summary.csv"), 
+                   row.names = FALSE))
+
+
+
+colnames(chs2020_cleaned)
+```
+
+
+# Descriptive analysis of key variables
+```{r}
+
+## k6_total
+chs2020_cleaned |> 
+  ggplot(aes(x=k6_total)) + geom_boxplot()
+summary(chs2020_cleaned$k6_total)
+
+## nspd
+chs2020_cleaned |>
+  mutate(nspd_response = case_when(nspd==1 ~ 'Yes', nspd==2 ~ 'No', is.na(nspd) ~ NA)) |>
+  group_by(nspd_response, ageband) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(ageband) |>
+  mutate(proportion = count / sum(count)*100)
+ 
+## ageband
+chs2020_cleaned |>
+  count(age_band) |>
+  summarize(
+    ageband=age_band,
+    percent = n/sum(n) *100,
+    count=n)
+
+## gender
+chs2020_cleaned |>
+  count(gender) |>
+  summarize(
+    gender=gender,
+    percent = n/sum(n) *100,
+    count=n)
+  
+chs2020_cleaned |>
+  group_by(gender, age_band) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(age_band) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+ 
+
+## race/ethnicity
+chs2020_cleaned |>
+  count(race_ethnicity) |>
+  summarize(
+    race_ethnicity=race_ethnicity,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned |>
+  group_by(race_ethnicity, age_band) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(age_band) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+## education
+chs2020_cleaned |>
+  mutate(
+    education_lev = 
+      case_when(education==1 ~ 'Less than high school',
+                education==2 ~ 'High school graduate',
+                education==3 ~ 'Some college/technical school',
+                education==4 ~ 'College graduate',
+                education=='.d' ~ 'Dont know',
+                education=='.r' ~ 'Refused',
+                is.na(education) ~ NA)
+    ) |>
+  count(education_lev) |>
+  summarize(
+    education=education_lev,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned |>
+   mutate(
+    education_lev = 
+      case_when(education==1 ~ 'Less than high school',
+                education==2 ~ 'High school graduate',
+                education==3 ~ 'Some college/technical school',
+                education==4 ~ 'College graduate',
+                education=='.d' ~ 'Dont know',
+                education=='.r' ~ 'Refused',
+                is.na(education) ~ NA)
+    ) |>
+  group_by(education_lev, age_band) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(age_band) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+
+## employment20
+chs2020_cleaned |>
+  mutate(
+    employment = 
+      case_when(employment20==1 ~ 'Employed for wages or salary',
+                employment20==2 ~ 'Self-employed',
+                employment20==3 ~ 'Unemployed for 1 year or more',
+                employment20==4 ~ 'Unemployed for less than 1 year',
+                employment20==5 ~ 'A homemaker',
+                employment20==6 ~ 'A student',
+                employment20==7 ~ 'Retired',
+                employment20==8 ~ 'Unable to work',
+                employment20=='.d' ~ 'Dont know',
+                employment20=='.r' ~ 'Refused',
+                is.na(employment20) ~ NA)
+    )|>
+  count(employment) |>
+  summarize(
+    employment=employment,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned |>
+   mutate(
+    employment = 
+      case_when(employment20==1 ~ 'Employed for wages or salary',
+                employment20==2 ~ 'Self-employed',
+                employment20==3 ~ 'Unemployed for 1 year or more',
+                employment20==4 ~ 'Unemployed for less than 1 year',
+                employment20==5 ~ 'A homemaker',
+                employment20==6 ~ 'A student',
+                employment20==7 ~ 'Retired',
+                employment20==8 ~ 'Unable to work',
+                employment20=='.d' ~ 'Dont know',
+                employment20=='.r' ~ 'Refused',
+                is.na(employment20) ~ NA)
+    )|>
+  group_by(employment, age_band) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(age_band) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+## imputed poverty group
+chs2020_cleaned |>
+  mutate(
+    poverty_level = 
+      case_when(imputed_povertygroup==1 ~ '<100% poverty',
+                imputed_povertygroup==2 ~ '100% - <200% poverty',
+                imputed_povertygroup==3 ~ '200% - <400% poverty',
+                imputed_povertygroup==4 ~ '400% - <600% poverty',
+                imputed_povertygroup==5~ '>=600% poverty',
+                is.na(imputed_povertygroup) ~ NA)
+    )|>
+  count(poverty_level) |>
+  summarize(
+    poverty_group=poverty_level,
+    percent =round( n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned |>
+   mutate(
+    poverty_level = 
+      case_when(imputed_povertygroup==1 ~ '<100% poverty',
+                imputed_povertygroup==2 ~ '100% - <200% poverty',
+                imputed_povertygroup==3 ~ '200% - <400% poverty',
+                imputed_povertygroup==4 ~ '400% - <600% poverty',
+                imputed_povertygroup==5~ '>=600% poverty',
+                is.na(imputed_povertygroup) ~ NA)
+    )|>
+  group_by(poverty_level, age_band) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(age_band) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+## hhsize
+chs2020_cleaned |>
+  count(hhsize) |>
+  summarize(
+    householdsize=hhsize,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+## delaypayrent
+chs2020_cleaned |>
+  mutate(delaypayrent_response = case_when(
+    delaypayrent == 1 ~ 'Yes',
+    delaypayrent == 2 ~ 'No',
+    delaypayrent == '.d' ~ 'Dont know',
+    delaypayrent == '.r' ~ 'Refused'
+  )) |>
+  count(delaypayrent_response) |>
+  summarize(
+    delaypayrent_response=delaypayrent_response,
+    percent = round(n/sum(n) *100,3),
+    count=n)
+
+## rodentsstreet
+chs2020_cleaned |>
+  mutate(rodent = case_when(
+    rodentsstreet == 1 ~ 'Yes',
+    rodentsstreet == 2 ~ 'No',
+    rodentsstreet == '.d' ~ 'Dont know',
+    rodentsstreet == '.r' ~ 'Refused'
+  )) |>
+  count(rodent) |>
+  summarize(
+    rodentsstreet_response=rodent,
+    percent =round( n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned |>
+   mutate(rodent = case_when(
+    rodentsstreet == 1 ~ 'Yes',
+    rodentsstreet == 2 ~ 'No',
+    rodentsstreet == '.d' ~ 'Dont know',
+    rodentsstreet == '.r' ~ 'Refused'
+  ))|>
+  group_by(rodent, age_band) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(age_band) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+## smellcigsmoke20_q1
+chs2020_cleaned |>
+  mutate(smellcig = case_when(
+    smellcigsmoke20_q1 == 1 ~ 'Everyday',
+    smellcigsmoke20_q1 == 2 ~ 'A few times per week',
+    smellcigsmoke20_q1 == 3 ~ 'A few times per month',
+    smellcigsmoke20_q1 == 4 ~ 'A few times per year',
+    smellcigsmoke20_q1 == 5 ~ 'Never',
+    smellcigsmoke20_q1 == '.d' ~ 'Dont know',
+    smellcigsmoke20_q1 == '.r' ~ 'Refused',
+    is.na(smellcigsmoke20_q1) ~ NA
+  )) |>
+  count(smellcig) |>
+  summarize(
+    smellcigsmoke=smellcig,
+    percent =round(n/sum(n) *100,3),
+    count=n)
+
+chs2020_cleaned |>
+   mutate(smellcig = case_when(
+    smellcigsmoke20_q1 == 1 ~ 'Everyday',
+    smellcigsmoke20_q1 == 2 ~ 'A few times per week',
+    smellcigsmoke20_q1 == 3 ~ 'A few times per month',
+    smellcigsmoke20_q1 == 4 ~ 'A few times per year',
+    smellcigsmoke20_q1 == 5 ~ 'Never',
+    smellcigsmoke20_q1 == '.d' ~ 'Dont know',
+    smellcigsmoke20_q1 == '.r' ~ 'Refused',
+    is.na(smellcigsmoke20_q1) ~ NA
+  )) |>
+  group_by(smellcig, age_band) |>
+  count() |>
+  summarize(
+    count=n,
+    .groups='drop'
+    ) |>
+  group_by(age_band) |>
+  mutate(proportion_by_age = count / sum(count)*100)
+
+
+```
+
+# TABLE B
+```{r}
+summary_B <- tibble(
+  Variable = c("General Health", "Fruit/Veg Intake", "Delayed Rent", "Unmet Care"),
+  Correlation = c(
+    cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$generalhealth, use = "complete.obs", 
+        method = "spearman"),
+    cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$fruitveg20, use = "complete.obs", 
+        method = "pearson"),
+    cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$delaypayrent0, use = "complete.obs",
+        method = "pearson"),
+    cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$didntgetcare0, use = "complete.obs",
+        method = "pearson")
+  ),
+  Regression_Coefficient = c(
+    coef(summary(lm(generalhealth ~ social_cohesion, data=chs2020_cleaned)))[2, "Estimate"],
+    coef(summary(lm(fruitveg20 ~ social_cohesion, data=chs2020_cleaned)))[2, "Estimate"],
+    coef(summary(glm(delaypayrent0 ~ social_cohesion, data=chs2020_cleaned,
+                     family = binomial)))[2, "Estimate"],
+    coef(summary(glm(didntgetcare0 ~ social_cohesion, data=chs2020_cleaned, 
+                     family = binomial)))[2, "Estimate"]
+  ),
+  Odds_Ratio = c(
+    NA_real_,
+    NA_real_,
+    exp(coef(summary(glm(delaypayrent0 ~ social_cohesion, data=chs2020_cleaned,
+                     family = binomial)))[2, "Estimate"]),
+    exp(coef(summary(glm(didntgetcare0 ~ social_cohesion, data=chs2020_cleaned, 
+                     family = binomial)))[2, "Estimate"])
+  ),
+  pValue = c(
+    coef(summary(lm(generalhealth ~ social_cohesion, data=chs2020_cleaned)))[2, "Pr(>|t|)"],
+    coef(summary(lm(fruitveg20 ~ social_cohesion, data=chs2020_cleaned)))[2, "Pr(>|t|)"],
+    coef(summary(glm(delaypayrent0 ~ social_cohesion, data=chs2020_cleaned, 
+                     family = binomial)))[2, "Pr(>|z|)"],
+    coef(summary(glm(didntgetcare0 ~ social_cohesion, data=chs2020_cleaned, 
+                     family = binomial)))[2, "Pr(>|z|)"]
+  )
+)
+
+summary_B <- summary_B %>%
+  mutate(
+    across(where(is.numeric), ~ round(., 3)),
+    pValue = sapply(pValue, function(p) {
+      if (is.na(p)) {
+        NA_character_
+      } else if (p < 1e-10) {
+        "<1e-10"
+      } else {
+        formatC(p, format = "f", digits = 3)
+      }
+    })
+  )
+
+write.csv(summary_B, "construct_validity_table.csv", row.names = FALSE, na = "")
+
+
+
+
+```
+
