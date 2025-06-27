@@ -7,6 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
 
 # Week 3
@@ -53,7 +54,48 @@ chs2020_cleaned$k6_total <-
   rowSums(chs2020_cleaned[, c("mood1", "mood2", "mood3", "mood4", "mood5", "mood6")],
                             na.rm = TRUE)
 
-chs2020_cleaned$social_cohesion <- rowSums(chs2020_cleaned[, c("helpneighbors20_q1",
+sc_items <- c("helpneighbors20_q1", "discussissues","helpcommproj", "trustkeys","proudneigh")
+
+for(i in 1:5) {
+  chs2020_cleaned <-
+    chs2020_cleaned |>
+    mutate(
+      helpneighbors20_q1_rev = case_when(helpneighbors20_q1==1 ~ 5,
+                                         helpneighbors20_q1==2 ~ 4,
+                                         helpneighbors20_q1==3 ~ 3,
+                                         helpneighbors20_q1==4 ~ 2,
+                                         helpneighbors20_q1==5 ~ 1,
+                                         is.na(helpneighbors20_q1) ~ NA),
+      discussissues_rev = case_when(discussissues==1 ~ 4,
+                                    discussissues==2 ~ 3,
+                                    discussissues==3 ~ 2,
+                                    discussissues==4 ~ 1,
+                                    is.na(discussissues) ~ NA),
+      helpcommproj_rev = case_when(helpcommproj==1 ~ 4,
+                                   helpcommproj==2 ~ 3,
+                                   helpcommproj==3 ~ 2,
+                                   helpcommproj==4 ~ 1,
+                                   is.na(helpcommproj) ~ NA),
+      trustkeys_rev = case_when(trustkeys==1 ~ 4,
+                                trustkeys==2 ~ 3,
+                                trustkeys==3 ~ 2,
+                                trustkeys==4 ~ 1,
+                                is.na(trustkeys) ~ NA),
+      proudneigh_rev = case_when(proudneigh==1 ~ 4,
+                                 proudneigh==2 ~ 3,
+                                 proudneigh==3 ~ 2,
+                                 proudneigh==4 ~ 1,
+                                 is.na(proudneigh) ~ NA)
+    )
+}
+
+
+chs2020_cleaned$social_cohesion_rev<- rowMeans(chs2020_cleaned[, c("helpneighbors20_q1_rev",
+                                               "discussissues_rev",
+                                               "helpcommproj_rev",
+                                               "trustkeys_rev",
+                                               "proudneigh_rev")], na.rm = TRUE)
+chs2020_cleaned$social_cohesion <- rowMeans(chs2020_cleaned[, c("helpneighbors20_q1",
                                                "discussissues",
                                                "helpcommproj",
                                                "trustkeys",
@@ -67,7 +109,7 @@ write.csv(chs2020_cleaned, "chs2020_working_w3.csv", row.names = FALSE)
 
 # Construct Validity
 ```{r}
-# general ehatlh
+# general health
 cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$generalhealth, use = 'complete.obs', method = 'spearman')
 
 summary(lm(generalhealth ~ social_cohesion, data=chs2020_cleaned))
@@ -89,7 +131,7 @@ chs2020_cleaned<- chs2020_cleaned |> mutate(delaypayrent0 = case_when(
 ))
 
 rent_glm <- glm(delaypayrent0 ~ social_cohesion, data=chs2020_cleaned, family = binomial)
-exp(-0.04206)
+exp(-0.23553  )
 summary(rent_glm)
 
 
@@ -102,7 +144,60 @@ chs2020_cleaned<- chs2020_cleaned |> mutate(didntgetcare0 = case_when(
 ))
 
 care_glm<- glm(didntgetcare0 ~ social_cohesion, data=chs2020_cleaned, family = binomial)
-exp(-0.04194)
+exp(-0.19354)
+summary(care_glm)
+
+# --------------------------REVERSE CODED-------------------------------
+
+
+# general health
+chs2020_cleaned<- chs2020_cleaned |> mutate(generalhealth_r = case_when(
+  generalhealth == 1 ~ 5,
+  generalhealth == 2 ~ 4,
+  generalhealth == 3 ~ 3,
+  generalhealth == 4 ~ 2,
+  generalhealth == 5 ~ 1,
+  is.na(generalhealth) ~ NA
+))
+
+cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$generalhealth_r, use = 'complete.obs', method = 'spearman')
+
+summary(lm(generalhealth_r ~ social_cohesion_rev, data=chs2020_cleaned))
+
+plot(y=as.factor(chs2020_cleaned$generalhealth_r), x=chs2020_cleaned$social_cohesion_rev)
+
+#fruitveg20
+cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$fruitveg20, 
+    use = 'complete.obs', method = 'pearson')
+summary(lm(fruitveg20 ~ social_cohesion_rev, data=chs2020_cleaned))
+
+
+#delaypayrent
+cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$delaypayrent, use = 'complete.obs', method = 'pearson')
+
+chs2020_cleaned<- chs2020_cleaned |> mutate(delaypayrent0 = case_when(
+  delaypayrent == 1 ~ 1,
+  delaypayrent == 2 ~ 0,
+  is.na(delaypayrent) ~ NA
+))
+
+rent_glm <- glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned, family = binomial)
+exp(-0.23553)
+summary(rent_glm)
+
+exp(coef(rent_glm))
+#didntgetcare20
+chs2020_cleaned<- chs2020_cleaned |> mutate(didntgetcare0 = case_when(
+  didntgetcare20 == 1 ~ 1,
+  didntgetcare20 == 2 ~ 0,
+  is.na(didntgetcare20) ~ NA
+))
+cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$didntgetcare20, 
+    use = 'complete.obs', method = 'pearson')
+
+
+care_glm<- glm(didntgetcare0 ~ social_cohesion_rev, data=chs2020_cleaned, family = binomial)
+exp(-0.19153)
 summary(care_glm)
 
 ```
@@ -111,14 +206,14 @@ summary(care_glm)
 # Criterion validity
 ```{r }
 
-cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$k6, use = 'complete.obs', method = 'pearson')
+cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$k6, use = 'complete.obs', method = 'pearson')
 
 summary(lm(k6 ~ social_cohesion ,data=chs2020_cleaned))
 
 ```
 
 # Summary TABLE A (MAYBE)
-```{r}
+```{r, eval=FALSE}
 
 library(dplyr)
 library(purrr)
@@ -273,7 +368,7 @@ colnames(chs2020_cleaned)
 
 
 # Descriptive analysis of key variables
-```{r}
+```{r, eval=F}
 
 ## k6_total
 chs2020_cleaned |> 
@@ -297,6 +392,14 @@ chs2020_cleaned |>
   count(age_band) |>
   summarize(
     ageband=age_band,
+    percent = n/sum(n) *100,
+    count=n)
+
+## usborn
+chs2020_cleaned |>
+  count(usborn) |>
+  summarize(
+    usborn=usborn,
     percent = n/sum(n) *100,
     count=n)
 
@@ -551,42 +654,150 @@ chs2020_cleaned |>
 
 ```
 
+```{r}
+library(dplyr)
+library(knitr)
+library(kableExtra)
+
+summarize_variable_clean <- function(data, var, var_label) {
+  tab <- data %>%
+    count(!!sym(var)) %>%
+    filter(!is.na(!!sym(var))) %>%
+    mutate(
+      percent = round(n / sum(n) * 100, 2),
+      Variable = var_label,
+      Category = str_to_title(as.character(!!sym(var))),
+      n = n
+    ) %>%
+    select(Variable, Category, n, percent) %>%
+    arrange(desc(percent))  # <- Sort by percent
+
+  # Blank out the repeated variable label (except first)
+  tab$Variable[-1] <- ""
+  tab
+}
+
+gender_table <- summarize_variable_clean(chs2020_cleaned, "gender", "Gender")
+ageband_table <- summarize_variable_clean(chs2020_cleaned, "age_band", "Age Band")
+race_table <- summarize_variable_clean(chs2020_cleaned, "race_ethnicity", "Race/Ethnicity")
+hhsize_table <- summarize_variable_clean(chs2020_cleaned, "hhsize", "Household Size")
+
+# Recoded: Usborn
+birthplace_table <- chs2020_cleaned |>
+  mutate(usborn = case_when(
+    usborn == 1 ~ 'US Born',
+    usborn == 2 ~ 'Foreign Born',
+    TRUE ~ NA_character_
+  ))  %>%
+  summarize_variable_clean("usborn", "Birthplace")
+
+# Recoded: Education
+education_table <- chs2020_cleaned %>%
+  mutate(education = case_when(
+    education == 1 ~ 'Less than high school',
+    education == 2 ~ 'High school graduate',
+    education == 3 ~ 'Some college/technical school',
+    education == 4 ~ 'College graduate',
+    education == ".d" ~ 'Don’t know',
+    education == ".r" ~ 'Refused',
+    TRUE ~ NA_character_
+  )) %>%
+  summarize_variable_clean("education", "Education")
+
+# Recoded: Employment
+employment_table <- chs2020_cleaned %>%
+  mutate(employment = case_when(
+    employment20 == 1 ~ 'Employed for wages or salary',
+    employment20 == 2 ~ 'Self-employed',
+    employment20 == 3 ~ 'Unemployed 1+ year',
+    employment20 == 4 ~ 'Unemployed <1 year',
+    employment20 == 5 ~ 'Homemaker',
+    employment20 == 6 ~ 'Student',
+    employment20 == 7 ~ 'Retired',
+    employment20 == 8 ~ 'Unable to work',
+    employment20 == ".d" ~ 'Don’t know',
+    employment20 == ".r" ~ 'Refused',
+    TRUE ~ NA_character_
+  )) %>%
+  summarize_variable_clean("employment", "Employment")
+
+# Recoded: Poverty Level
+poverty_table <- chs2020_cleaned %>%
+  mutate(poverty_level = case_when(
+    imputed_povertygroup == 1 ~ '<100% poverty',
+    imputed_povertygroup == 2 ~ '100% - <200% poverty',
+    imputed_povertygroup == 3 ~ '200% - <400% poverty',
+    imputed_povertygroup == 4 ~ '400% - <600% poverty',
+    imputed_povertygroup == 5 ~ '>=600% poverty',
+    TRUE ~ NA_character_
+  )) %>%
+  summarize_variable_clean("poverty_level", "Poverty Group")
+
+
+summary_table <- bind_rows(
+  gender_table,
+  birthplace_table,
+  ageband_table,
+  race_table,
+  education_table,
+  employment_table,
+  poverty_table,
+  hhsize_table
+)
+
+```
+\newpage
+```{r}
+
+summary_table <- summary_table |>
+  rename('%' = percent)
+
+summary_table %>%
+  kable(caption = "Demographic Distribution") %>%
+  kable_styling(full_width = FALSE)
+
+
+```
+
+
+
+
 # TABLE B
 ```{r}
 summary_B <- tibble(
   Variable = c("General Health", "Fruit/Veg Intake", "Delayed Rent", "Unmet Care"),
   Correlation = c(
-    cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$generalhealth, use = "complete.obs", 
+    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$generalhealth_r, use = "complete.obs", 
         method = "spearman"),
-    cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$fruitveg20, use = "complete.obs", 
+    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$fruitveg20, use = "complete.obs", 
         method = "pearson"),
-    cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$delaypayrent0, use = "complete.obs",
+    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$delaypayrent0, use = "complete.obs",
         method = "pearson"),
-    cor(chs2020_cleaned$social_cohesion, chs2020_cleaned$didntgetcare0, use = "complete.obs",
+    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$didntgetcare0, use = "complete.obs",
         method = "pearson")
   ),
   Regression_Coefficient = c(
-    coef(summary(lm(generalhealth ~ social_cohesion, data=chs2020_cleaned)))[2, "Estimate"],
-    coef(summary(lm(fruitveg20 ~ social_cohesion, data=chs2020_cleaned)))[2, "Estimate"],
-    coef(summary(glm(delaypayrent0 ~ social_cohesion, data=chs2020_cleaned,
+    coef(summary(lm(generalhealth_r ~ social_cohesion_rev, data=chs2020_cleaned)))[2, "Estimate"],
+    coef(summary(lm(fruitveg20 ~ social_cohesion_rev, data=chs2020_cleaned)))[2, "Estimate"],
+    coef(summary(glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned,
                      family = binomial)))[2, "Estimate"],
-    coef(summary(glm(didntgetcare0 ~ social_cohesion, data=chs2020_cleaned, 
+    coef(summary(glm(didntgetcare0 ~ social_cohesion_rev, data=chs2020_cleaned, 
                      family = binomial)))[2, "Estimate"]
   ),
   Odds_Ratio = c(
-    NA_real_,
-    NA_real_,
-    exp(coef(summary(glm(delaypayrent0 ~ social_cohesion, data=chs2020_cleaned,
+    '.',
+    '.',
+    exp(coef(summary(glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned,
                      family = binomial)))[2, "Estimate"]),
-    exp(coef(summary(glm(didntgetcare0 ~ social_cohesion, data=chs2020_cleaned, 
+    exp(coef(summary(glm(didntgetcare0 ~ social_cohesion_rev, data=chs2020_cleaned, 
                      family = binomial)))[2, "Estimate"])
   ),
   pValue = c(
-    coef(summary(lm(generalhealth ~ social_cohesion, data=chs2020_cleaned)))[2, "Pr(>|t|)"],
-    coef(summary(lm(fruitveg20 ~ social_cohesion, data=chs2020_cleaned)))[2, "Pr(>|t|)"],
-    coef(summary(glm(delaypayrent0 ~ social_cohesion, data=chs2020_cleaned, 
+    coef(summary(lm(generalhealth_r ~ social_cohesion_rev, data=chs2020_cleaned)))[2, "Pr(>|t|)"],
+    coef(summary(lm(fruitveg20 ~ social_cohesion_rev, data=chs2020_cleaned)))[2, "Pr(>|t|)"],
+    coef(summary(glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned, 
                      family = binomial)))[2, "Pr(>|z|)"],
-    coef(summary(glm(didntgetcare0 ~ social_cohesion, data=chs2020_cleaned, 
+    coef(summary(glm(didntgetcare0 ~ social_cohesion_rev, data=chs2020_cleaned, 
                      family = binomial)))[2, "Pr(>|z|)"]
   )
 )
@@ -603,12 +814,24 @@ summary_B <- summary_B %>%
         formatC(p, format = "f", digits = 3)
       }
     })
-  )
+  ) |>
+  rename('Odds Ratio' = Odds_Ratio, '$\\beta$' = Regression_Coefficient, 'p' = pValue)
 
-write.csv(summary_B, "construct_validity_table.csv", row.names = FALSE, na = "")
+summary_B %>%
+  kable(caption = "Construct Validity") %>%
+  kable_styling(full_width = FALSE)
 
 
+#write.csv(summary_B, "construct_validity_table.csv", row.names = FALSE, na = "")
 
+```
+
+# TABLE C
+```{r}
+
+summary_C <- tibble(
+  
+)
 
 ```
 
