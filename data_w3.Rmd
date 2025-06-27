@@ -764,62 +764,77 @@ summary_table %>%
 
 # TABLE B
 ```{r}
+library(dplyr)
+library(knitr)
+library(kableExtra)
+
 summary_B <- tibble(
   Variable = c("General Health", "Fruit/Veg Intake", "Delayed Rent", "Unmet Care"),
   Correlation = c(
-    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$generalhealth_r, use = "complete.obs", 
-        method = "spearman"),
-    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$fruitveg20, use = "complete.obs", 
-        method = "pearson"),
-    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$delaypayrent0, use = "complete.obs",
-        method = "pearson"),
-    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$didntgetcare0, use = "complete.obs",
-        method = "pearson")
-  ),
+    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$generalhealth_r, 
+        use = "complete.obs", method = "spearman"),
+    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$fruitveg20,  
+        use = "complete.obs", method = "pearson"),
+    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$delaypayrent0,  
+        use = "complete.obs", method = "pearson"),
+    cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$didntgetcare0,  
+        use = "complete.obs", method = "pearson")),
   Regression_Coefficient = c(
     coef(summary(lm(generalhealth_r ~ social_cohesion_rev, data=chs2020_cleaned)))[2, "Estimate"],
     coef(summary(lm(fruitveg20 ~ social_cohesion_rev, data=chs2020_cleaned)))[2, "Estimate"],
-    coef(summary(glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned,
-                     family = binomial)))[2, "Estimate"],
+    coef(summary(glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned, 
+                     family=binomial)))[2, "Estimate"],
     coef(summary(glm(didntgetcare0 ~ social_cohesion_rev, data=chs2020_cleaned, 
-                     family = binomial)))[2, "Estimate"]
-  ),
+                     family=binomial)))[2, "Estimate"]),
   Odds_Ratio = c(
-    '.',
-    '.',
-    exp(coef(summary(glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned,
-                     family = binomial)))[2, "Estimate"]),
-    exp(coef(summary(glm(didntgetcare0 ~ social_cohesion_rev, data=chs2020_cleaned, 
-                     family = binomial)))[2, "Estimate"])
-  ),
+    NA, NA,
+    exp(coef(summary(glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned, 
+                         family=binomial)))[2, "Estimate"]),
+    exp(coef(summary(glm(didntgetcare0 ~ social_cohesion_rev, data=chs2020_cleaned,
+                         family=binomial)))[2, "Estimate"])),
   pValue = c(
     coef(summary(lm(generalhealth_r ~ social_cohesion_rev, data=chs2020_cleaned)))[2, "Pr(>|t|)"],
     coef(summary(lm(fruitveg20 ~ social_cohesion_rev, data=chs2020_cleaned)))[2, "Pr(>|t|)"],
-    coef(summary(glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned, 
-                     family = binomial)))[2, "Pr(>|z|)"],
+    coef(summary(glm(delaypayrent0 ~ social_cohesion_rev, data=chs2020_cleaned,
+                     family=binomial)))[2, "Pr(>|z|)"],
     coef(summary(glm(didntgetcare0 ~ social_cohesion_rev, data=chs2020_cleaned, 
-                     family = binomial)))[2, "Pr(>|z|)"]
-  )
+                     family=binomial)))[2, "Pr(>|z|)"])
 )
 
 summary_B <- summary_B %>%
+  # Round numeric columns except Odds_Ratio and pValue first
   mutate(
-    across(where(is.numeric), ~ round(., 3)),
+    Correlation = round(Correlation, 3),
+    Regression_Coefficient = round(Regression_Coefficient, 3),
+    Odds_Ratio = ifelse(
+      is.na(Odds_Ratio),
+      ".",                             # placeholder for the first two
+      sprintf("%.3f", Odds_Ratio)      # round and format as string
+    ),
     pValue = sapply(pValue, function(p) {
-      if (is.na(p)) {
-        NA_character_
-      } else if (p < 1e-10) {
-        "<1e-10"
-      } else {
-        formatC(p, format = "f", digits = 3)
-      }
+      if      (is.na(p))      NA_character_
+      else if (p < 1e-10)     "<1e-10"
+      else sprintf("%.3f", p)
     })
-  ) |>
-  rename('Odds Ratio' = Odds_Ratio, '$\\beta$' = Regression_Coefficient, 'p' = pValue)
+  ) %>%
+  rename(
+    `Odds Ratio` = Odds_Ratio,
+    "$\\beta$" = Regression_Coefficient,  # unicode beta
+     p = pValue
+  )
 
+# print with kable
 summary_B %>%
-  kable(caption = "Construct Validity") %>%
-  kable_styling(full_width = FALSE)
+  kable(caption = "Construct Validity", format='markdown',escape = FALSE, 
+        col.names = c(
+      "Variable",
+      "Correlation",
+      "Beta",            # your beta column
+      "Odds Ratio",
+      "p"
+    )) %>%
+  kable_styling(full_width=F)
+
 
 
 #write.csv(summary_B, "construct_validity_table.csv", row.names = FALSE, na = "")
@@ -830,8 +845,25 @@ summary_B %>%
 ```{r}
 
 summary_C <- tibble(
-  
-)
+  Correlation = c(
+  cor(chs2020_cleaned$social_cohesion_rev, chs2020_cleaned$k6, 
+      use = 'complete.obs', method = 'pearson') ),
+  Regression_Coefficient = c(
+    coef(summary(lm(k6 ~ social_cohesion_rev,data=chs2020_cleaned)))[2, "Estimate"]),
+  pValue=c(
+    coef(summary(lm(k6 ~ social_cohesion_rev ,data=chs2020_cleaned)))[2, "Pr(>|t|)"]),
+  )
+
+
+summary_C %>%
+  mutate(pValue=ifelse((pValue < 1e-10), "<1e-10", sprintf("%.3f", pValue))) |>
+  kable(caption = "Criterion Validity (Relationship between K6 and Social Cohesion)",
+        escape = FALSE, 
+        col.names = c(
+      "Correlation",
+      "Beta",            # your beta column
+      "p"), digits=3) 
+
 
 ```
 
