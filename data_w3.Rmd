@@ -8,6 +8,9 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(dplyr)
+library(knitr)
+library(kableExtra)
 ```
 
 # Week 3
@@ -369,6 +372,13 @@ colnames(chs2020_cleaned)
 
 # Descriptive analysis of key variables
 ```{r, eval=F}
+# Compare scale performance by age group
+aggregate(social_cohesion_rev ~ age_band, data = chs2020_cleaned, FUN = mean, na.rm = TRUE)
+
+# ADDITIONAL: ANOVA
+sc_age_lm <- lm(social_cohesion_rev ~ age_band, data = chs2020_cleaned)
+anova(sc_age_lm)
+
 
 ## k6_total
 chs2020_cleaned |> 
@@ -655,22 +665,22 @@ chs2020_cleaned |>
 ```
 
 ```{r}
-library(dplyr)
-library(knitr)
-library(kableExtra)
-
 summarize_variable_clean <- function(data, var, var_label) {
-  tab <- data %>%
-    count(!!sym(var)) %>%
-    filter(!is.na(!!sym(var))) %>%
+  tab <- data |>
+    count(!!sym(var)) |>
+    filter(!is.na(!!sym(var))) |>
     mutate(
       percent = round(n / sum(n) * 100, 2),
       Variable = var_label,
-      Category = str_to_title(as.character(!!sym(var))),
+      Category = if (var_label == "Birthplace") {
+        # leave the text as-is for birthplace
+        as.character(!!sym(var))
+      } else {
+        str_to_title(as.character(!!sym(var)))
+      },
       n = n
-    ) %>%
-    select(Variable, Category, n, percent) %>%
-    arrange(desc(percent))  # <- Sort by percent
+    ) |>
+    select(Variable, Category, n, percent)
 
   # Blank out the repeated variable label (except first)
   tab$Variable[-1] <- ""
@@ -736,8 +746,8 @@ poverty_table <- chs2020_cleaned %>%
 
 summary_table <- bind_rows(
   gender_table,
-  birthplace_table,
   ageband_table,
+  birthplace_table,
   race_table,
   education_table,
   employment_table,
@@ -746,18 +756,23 @@ summary_table <- bind_rows(
 )
 
 ```
-\newpage
 ```{r}
-
 summary_table <- summary_table |>
   rename('%' = percent)
 
-summary_table %>%
-  kable(caption = "Demographic Distribution") %>%
-  kable_styling(full_width = FALSE)
 
+
+
+
+
+
+summary_table %>%
+  kable(caption = "Demographic Distribution")|>
+    kable_styling(latex_options = c("hold_position"),font_size = 9)|>
+  collapse_rows(columns = 1, valign = "top")
 
 ```
+
 
 
 
