@@ -1,0 +1,180 @@
+---
+title: "data_w4"
+author: "Celina Jang"
+date: "2025-07-01"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(forcats)
+library(dplyr)
+library(broom)
+library(kableExtra)
+```
+
+# Week 4
+```{r}
+chsw3 <- read.csv('chs2020_working_w3.csv')
+
+chsw3 <- chsw3 |> mutate(
+  # change binary variable values to 1 and 0
+  delaypayrent0 = case_when(
+    delaypayrent == 1 ~ 0,
+    delaypayrent == 2 ~ 1,
+    is.na(delaypayrent) ~ NA),
+  didntgetcare0 = case_when(
+    didntgetcare20 == 1 ~ 0,
+    didntgetcare20 == 2 ~ 1,
+    is.na(didntgetcare20) ~ NA),
+  nspd0 = case_when(
+    nspd == 1 ~ 1,
+    nspd == 2 ~ 0,
+    is.na(nspd) ~ NA
+  ),
+  rodentsstreet0 = case_when(
+    rodentsstreet==1 ~ 1,
+    rodentsstreet == 2 ~ 0,
+    is.na(rodentsstreet) ~ NA
+  ),
+  # want reference group to be white, so reorder
+  race_ethnicity = fct_relevel(race_ethnicity, 'White'),
+  # label employment20
+  employment = case_when(
+        employment20 == 1 ~ 'Employed for wages or salary',
+        employment20 == 2 ~ 'Self-employed',
+        employment20 == 3 ~ 'Unemployed for 1 year or more',
+        employment20 == 4 ~ 'Unemployed for less than 1 year',
+        employment20 == 5 ~ 'A homemaker',
+        employment20 == 6 ~ 'A student',
+        employment20 == 7 ~ 'Retired',
+        employment20 == 8 ~ 'Unable to work',
+        employment20 == '.d' ~ 'Dont know',
+        employment20 == '.r' ~ 'Refused',
+        is.na(employment20) ~ NA
+))
+
+# linear regression (unweighted)
+k6.fit.lm <- lm(k6 ~ social_cohesion_rev, data=chsw3)
+summary(k6.fit.lm)
+
+# logistic regression (unweighted)
+nspd.fit.lg <- glm(nspd ~ social_cohesion_rev, data=chsw3)
+summary(nspd.fit.lg)
+exp(coef(summary(nspd.fit.lg))[2, "Estimate"])
+
+# social cohesion by age
+sc_age_lm <- lm(social_cohesion_rev ~ age_band, data = chsw3)
+anova(sc_age_lm)
+
+
+```
+
+
+# Weighted analysis
+```{r}
+library(survey)
+
+# Setting the weights
+chs2020_svy <- svydesign(ids = ~1, strata = ~strata_q1, weights = ~wt21_dual_q1, data = chsw3)
+
+# multiple regression with continuous kessler (mental distress)
+svy_lm_k6 <- svyglm(k6 ~ social_cohesion_rev + age_band + gender + race_ethnicity + 
+                    education + employment + delaypayrent0 + rodentsstreet0,
+                    design = chs2020_svy)
+summary(svy_lm_k6)
+
+# multiple regression with binary psychological distress
+svy_glm_nspd <- svyglm(nspd0 ~ social_cohesion_rev + age_band + gender + race_ethnicity +
+                      education + employment + delaypayrent0 + rodentsstreet0,
+                      design = chs2020_svy, family = quasibinomial())
+summary(svy_glm_nspd)
+
+# interaction term (cohesion x age)
+svy_lm_k6_int <- svyglm(k6 ~ social_cohesion_rev * age_band + gender + race_ethnicity +
+                          education + employment20 + delaypayrent + rodentsstreet, 
+                        design = chs2020_svy)
+summary(svy_lm_k6_int)
+
+
+```
+
+
+# Visualizing regression results 
+```{r}
+# tidy the model
+tidy_model <- broom::tidy(svy_lm_k6)
+
+# filter for significant variables (p < 0.05)
+signif_vars <- tidy_model |>
+  filter(p.value < 0.05) |>
+  mutate(across(where(is.numeric), ~ round(., 3))) |>
+  rename(
+    Variable = term,
+    Estimate = estimate,
+    "Std. Error" = std.error,
+    "p-value" = p.value,
+    "t value" = statistic
+  ) |>
+  select(Variable, Estimate, 'Std. Error', 't value', "p-value")
+
+# create the table
+signif_vars |>
+  kable(caption = "Significant Predictors of K6 (Survey-Weighted Linear Regression)", escape=T) 
+
+```
+
+```{r}
+# Step 1: Tidy the model
+log_table <- tidy(svy_glm_nspd)
+
+# Step 2: Filter significant variables (before modifying p-value format)
+significant_terms <- log_table %>%
+  filter(p.value < 0.05 & term != "(Intercept)")
+
+# Step 3: Add formatting (after filtering)
+significant_terms <- significant_terms %>%
+  mutate(
+    "p-value" = ifelse(p.value < 1e-4, "<0.0001", round(p.value, 4)),
+    "Odds Ratio" = round(exp(estimate), 3),
+    Estimate = round(estimate, 3),
+    "Std. Error" = round(std.error, 3)
+  ) %>%
+  select(Term = term, Estimate, "Std. Error", "Odds Ratio", "p-value")
+
+
+# Display full table or significant terms only
+significant_terms %>%
+  kable(caption = "Significant Predictors of Psychological Distress (nspd)",
+        escape = T, align = "lcccc") 
+
+
+```
+
+
+```{r}
+# tidy table
+reg_table <- tidy(svy_lm_k6_int)
+
+# select significant variables
+reg_table_signif <- reg_table |> 
+  filter(p.value < 0.05) |> 
+  select(
+    Term = term, 
+    Estimate = estimate, 
+    "Std. Error" = std.error, 
+    "t value" = statistic, 
+    "p-value" = p.value
+  ) |> 
+  mutate(across(where(is.numeric), ~ round(., 3)))
+
+# put into table
+reg_table_signif |> 
+  kable(caption = "Significant Predictors in Cohesion X Age", align = "lcccc") 
+```
+
+
