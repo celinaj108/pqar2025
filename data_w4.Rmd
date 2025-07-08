@@ -56,13 +56,23 @@ chsw3 <- chsw3 |> mutate(
         employment20 == '.d' ~ 'Dont know',
         employment20 == '.r' ~ 'Refused',
         is.na(employment20) ~ NA
-))
+  ),
+    education1 = case_when(
+        education == 1 ~ 'Less than high school',
+        education == 2 ~ 'High school graduate',
+        education == 3 ~ 'Some college/technical school',
+        education == 4 ~ 'College graduate',
+        education == '.d' ~ 'Dont know',
+        education == '.r' ~ 'Refused',
+        is.na(education) ~ NA
+  )
+)
 
-# linear regression (unweighted)
+# linear regression (UNWEIGHTED)
 k6.fit.lm <- lm(k6 ~ social_cohesion_rev, data=chsw3)
 summary(k6.fit.lm)
 
-# logistic regression (unweighted)
+# logistic regression (UNWEIGHTED)
 nspd.fit.lg <- glm(nspd ~ social_cohesion_rev, data=chsw3)
 summary(nspd.fit.lg)
 exp(coef(summary(nspd.fit.lg))[2, "Estimate"])
@@ -84,22 +94,29 @@ chs2020_svy <- svydesign(ids = ~1, strata = ~strata_q1, weights = ~wt21_dual_q1,
 
 # multiple regression with continuous kessler (mental distress)
 svy_lm_k6 <- svyglm(k6 ~ social_cohesion_rev + age_band + gender + race_ethnicity + 
-                    education + employment + delaypayrent0 + rodentsstreet0,
+                    education1 + employment + delaypayrent0 + rodentsstreet0,
                     design = chs2020_svy)
 summary(svy_lm_k6)
 
 # multiple regression with binary psychological distress
 svy_glm_nspd <- svyglm(nspd0 ~ social_cohesion_rev + age_band + gender + race_ethnicity +
-                      education + employment + delaypayrent0 + rodentsstreet0,
+                      education1 + employment + delaypayrent0 + rodentsstreet0,
                       design = chs2020_svy, family = quasibinomial())
 summary(svy_glm_nspd)
 
 # interaction term (cohesion x age)
 svy_lm_k6_int <- svyglm(k6 ~ social_cohesion_rev * age_band + gender + race_ethnicity +
-                          education + employment20 + delaypayrent + rodentsstreet, 
+                          education1 + employment + delaypayrent0 + rodentsstreet0, 
                         design = chs2020_svy)
 summary(svy_lm_k6_int)
 
+
+# nspd and social cohesion log reg model
+summary(svyglm(nspd0 ~ social_cohesion_rev ,design=chs2020_svy, family=binomial))
+exp(-0.2863)
+
+# k6 and social cohesion linear reg model  
+summary(svyglm(k6 ~ social_cohesion_rev ,design=chs2020_svy))
 
 ```
 
@@ -108,6 +125,9 @@ summary(svy_lm_k6_int)
 ```{r}
 # tidy the model
 tidy_model <- broom::tidy(svy_lm_k6)
+
+
+
 
 # filter for significant variables (p < 0.05)
 signif_vars <- tidy_model |>
@@ -122,6 +142,9 @@ signif_vars <- tidy_model |>
   ) |>
   select(Variable, Estimate, 'Std. Error', 't value', "p-value")
 
+
+
+
 # create the table
 signif_vars |>
   kable(caption = "Significant Predictors of K6 (Survey-Weighted Linear Regression)", escape=T) 
@@ -132,9 +155,12 @@ signif_vars |>
 # Step 1: Tidy the model
 log_table <- tidy(svy_glm_nspd)
 
+
+
 # Step 2: Filter significant variables (before modifying p-value format)
 significant_terms <- log_table %>%
   filter(p.value < 0.05 & term != "(Intercept)")
+
 
 # Step 3: Add formatting (after filtering)
 significant_terms <- significant_terms %>%
@@ -145,6 +171,7 @@ significant_terms <- significant_terms %>%
     "Std. Error" = round(std.error, 3)
   ) %>%
   select(Term = term, Estimate, "Std. Error", "Odds Ratio", "p-value")
+
 
 
 # Display full table or significant terms only
@@ -175,6 +202,128 @@ reg_table_signif <- reg_table |>
 # put into table
 reg_table_signif |> 
   kable(caption = "Significant Predictors in Cohesion X Age", align = "lcccc") 
+
+library(interactions)
+interact_plot(svy_lm_k6_int, pred = social_cohesion_rev, modx = age_band, 
+              plot.points = F, interval = TRUE, main.title = "Cohesion × Age Group Interaction",
+              x.label='Social Cohesion', y.label = 'K6')
+
 ```
 
+# Checking Multicollinearity
+```{r}
+library(car)
+lm_k6 <- lm(k6 ~ social_cohesion_rev + age_band + gender + race_ethnicity + 
+              education1 + employment + delaypayrent0 + rodentsstreet0, data = chsw3)
+vif(lm_k6)
+```
+
+# Separate models by age group
+```{r}
+# 65+
+svy_65plus <- subset(chs2020_svy, age_band == "65+")
+model_65plus <- svyglm(k6 ~ social_cohesion_rev + gender + race_ethnicity + 
+                         education1 + employment + delaypayrent0 + rodentsstreet0, 
+                       design = svy_65plus)
+summary(model_65plus)
+
+# 45-64
+svy_45 <- subset(chs2020_svy, age_band == '45-64')
+model_45 <- svyglm(k6 ~ social_cohesion_rev + gender + race_ethnicity + 
+                         education1 + employment + delaypayrent0 + rodentsstreet0, 
+                       design = svy_45)
+summary(model_45)
+
+# 18-44
+svy_18 <- subset(chs2020_svy, age_band == '18-44')
+model_18 <- svyglm(k6 ~ social_cohesion_rev + gender + race_ethnicity + 
+                         education1 + employment + delaypayrent0 + rodentsstreet0, 
+                       design = svy_18)
+summary(model_18)
+```
+
+# Weighted ANOVA
+```{r}
+svy_aov <- svyglm(social_cohesion_rev ~ age_band, design = chs2020_svy)
+summary(svy_aov)
+
+# Post hoc comparisons (Bonferroni adjustment) 
+library(emmeans)
+emmeans(svy_aov, pairwise ~ age_band, adjust = "bonferroni")
+
+
+```
+# Standardizing
+```{r}
+# Standardize selected predictors
+chsw3$z_cohesion <- scale(chsw3$social_cohesion_rev)
+chsw3$z_delaypayrent <- scale(chsw3$delaypayrent0)
+chsw3$z_rodents <- scale(chsw3$rodentsstreet0)
+
+# Now update the survey object with the new variables
+chs2020_svy_z <- update(chs2020_svy, z_cohesion = chsw3$z_cohesion,
+                        z_delaypayrent = chsw3$z_delaypayrent,
+                        z_rodents = chsw3$z_rodents)
+
+# Run the weighted model
+svy_lm_k6_z <- svyglm(k6 ~ z_cohesion + age_band + gender + race_ethnicity +
+                      education1 + employment + z_delaypayrent + z_rodents,
+                      design = chs2020_svy_z)
+
+summary(svy_lm_k6_z)
+
+
+# Step 1: Tidy the model
+std_table <- tidy(svy_lm_k6_z)
+
+
+# filter for significant variables (p < 0.05)
+signif_vars <- std_table |>
+  filter(p.value < 0.05) |>
+  mutate(across(where(is.numeric), ~ round(., 3))) |>
+  rename(
+    Variable = term,
+    Estimate = estimate,
+    "Std. Error" = std.error,
+    "p-value" = p.value,
+    "t value" = statistic
+  ) |>
+  select(Variable, Estimate, 'Std. Error', 't value', "p-value")
+
+
+# create the table
+signif_vars |>
+  kable(caption = "Significant Predictors of K6 (Standardized Linear Regression)", escape=T) 
+
+```
+
+# Visualizing effect of social cohesion across age
+```{r}
+# First, extract confidence intervals
+ci_18 <- confint(model_18)["social_cohesion_rev", ]
+ci_45 <- confint(model_45)["social_cohesion_rev", ]
+ci_65 <- confint(model_65plus)["social_cohesion_rev", ]
+
+# Build a summary data frame
+coef_data <- data.frame(
+  age_group = c("18–44", "45–64", "65+"),
+  coef = c(coef(model_18)["social_cohesion_rev"],
+           coef(model_45)["social_cohesion_rev"],
+           coef(model_65plus)["social_cohesion_rev"]),
+  lower = c(ci_18[1], ci_45[1], ci_65[1]),
+  upper = c(ci_18[2], ci_45[2], ci_65[2])
+)
+
+# plot
+library(ggplot2)
+
+ggplot(coef_data, aes(x = age_group, y = coef)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  labs(title = "Effect of Social Cohesion on Psychological Distress by Age Group",
+       x = "Age Group", y = "Coefficient from Weighted Regression") +
+  theme_minimal() +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.5)
+
+```
 
