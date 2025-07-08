@@ -69,19 +69,30 @@ chsw3 <- chsw3 |> mutate(
 )
 
 # linear regression (UNWEIGHTED)
+# simple
 k6.fit.lm <- lm(k6 ~ social_cohesion_rev, data=chsw3)
 summary(k6.fit.lm)
 
+# mulitple
+k6.fit.m.lm <- lm(k6 ~ social_cohesion_rev + age_band + gender + race_ethnicity + 
+                    education1 + employment + delaypayrent0 + rodentsstreet0, data=chsw3)
+summary(k6.fit.m.lm)
+
 # logistic regression (UNWEIGHTED)
-nspd.fit.lg <- glm(nspd ~ social_cohesion_rev, data=chsw3)
+# simple
+nspd.fit.lg <- glm(nspd0 ~ social_cohesion_rev, data=chsw3)
 summary(nspd.fit.lg)
+exp(coef(summary(nspd.fit.lg))[2, "Estimate"])
+
+# multiple
+nspd.fit.m.lg <- glm(nspd ~ social_cohesion_rev + age_band + gender + race_ethnicity + 
+                    education1 + employment + delaypayrent0 + rodentsstreet0, data=chsw3)
+summary(nspd.fit.m.lg)
 exp(coef(summary(nspd.fit.lg))[2, "Estimate"])
 
 # social cohesion by age
 sc_age_lm <- lm(social_cohesion_rev ~ age_band, data = chsw3)
 anova(sc_age_lm)
-
-
 ```
 
 
@@ -213,9 +224,15 @@ interact_plot(svy_lm_k6_int, pred = social_cohesion_rev, modx = age_band,
 # Checking Multicollinearity
 ```{r}
 library(car)
+# k6
 lm_k6 <- lm(k6 ~ social_cohesion_rev + age_band + gender + race_ethnicity + 
               education1 + employment + delaypayrent0 + rodentsstreet0, data = chsw3)
 vif(lm_k6)
+
+# nspd
+glm_nspd <- glm(nspd0 ~ social_cohesion_rev + age_band + gender + race_ethnicity + 
+              education1 + employment + delaypayrent0 + rodentsstreet0, data = chsw3)
+vif(glm_nspd)
 ```
 
 # Separate models by age group
